@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 
@@ -7,6 +7,10 @@ const DistributorManagement = () => {
   const [distributors, setDistributors] = useState([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [filter, setFilter] = useState("");
+  const [currentDistributor, setCurrentDistributor] = useState(null); // For editing
+
+  // API base URL
+  const apiUrl = "http://192.168.2.172:1337/api/distributors";
 
   // Validation schema with Yup
   const validationSchema = Yup.object({
@@ -40,10 +44,18 @@ const DistributorManagement = () => {
       logo: null,
     },
     validationSchema,
-    onSubmit: (values) => {
-      setDistributors((prev) => [...prev, values]);
+    onSubmit: async (values) => {
+      if (currentDistributor) {
+        // Update distributor
+        await updateDistributor(currentDistributor.id, values);
+      } else {
+        // Create distributor
+        await createDistributor(values);
+      }
       formik.resetForm(); // Reset the form
       setIsFormVisible(false); // Hide the form after submission
+      setCurrentDistributor(null); // Reset current distributor
+      fetchDistributors(); // Refetch distributors
     },
   });
 
@@ -55,10 +67,50 @@ const DistributorManagement = () => {
     "Distributor",
   ];
 
+  // Fetch all distributors on component mount
+  const fetchDistributors = async () => {
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    setDistributors(data);
+  };
+
+  // Create a distributor
+  const createDistributor = async (values) => {
+    await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(values),
+    });
+  };
+
+  // Update a distributor
+  const updateDistributor = async (id, values) => {
+    await fetch(`${apiUrl}/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(values),
+    });
+  };
+
   // Function to filter distributors
   const filteredDistributors = distributors.filter((distributor) =>
     distributor.name.toLowerCase().includes(filter.toLowerCase())
   );
+
+  useEffect(() => {
+    fetchDistributors(); // Fetch distributors when component mounts
+  }, []);
+
+  // Function to handle edit distributor
+  const handleEdit = (distributor) => {
+    formik.setValues(distributor);
+    setIsFormVisible(true);
+    setCurrentDistributor(distributor);
+  };
 
   return (
     <div className="p-8 bg-gray-50">
@@ -74,7 +126,11 @@ const DistributorManagement = () => {
         {/* Assuming only Manufacturer Owner can see this button */}
         <button
           className="bg-blue-600 text-white py-2 px-4 rounded"
-          onClick={() => setIsFormVisible(true)}
+          onClick={() => {
+            setIsFormVisible(true);
+            formik.resetForm(); // Reset the form for new entry
+            setCurrentDistributor(null); // Reset current distributor for new entry
+          }}
         >
           Add Distributor
         </button>
@@ -83,8 +139,9 @@ const DistributorManagement = () => {
       {/* Distributor Creation Form */}
       {isFormVisible && (
         <form onSubmit={formik.handleSubmit} className="mb-8 p-4 border rounded bg-white shadow">
-          <h2 className="text-lg font-bold mb-4">Add Distributor</h2>
+          <h2 className="text-lg font-bold mb-4">{currentDistributor ? "Edit Distributor" : "Add Distributor"}</h2>
           <div className="grid grid-cols-2 gap-4">
+            {/* Form fields */}
             <input
               type="text"
               name="name"
@@ -215,7 +272,7 @@ const DistributorManagement = () => {
               type="submit"
               className="bg-blue-600 text-white py-2 px-4 rounded"
             >
-              Review and Submit
+              {currentDistributor ? "Update Distributor" : "Review and Submit"}
             </button>
           </div>
         </form>
@@ -244,7 +301,10 @@ const DistributorManagement = () => {
                     <button className="text-blue-600 hover:underline mr-2">
                       View
                     </button>
-                    <button className="text-blue-600 hover:underline">
+                    <button
+                      className="text-blue-600 hover:underline"
+                      onClick={() => handleEdit(distributor)} // Set the current distributor for editing
+                    >
                       Edit
                     </button>
                   </td>
@@ -260,5 +320,6 @@ const DistributorManagement = () => {
       </div>
     </div>
   );
-}
-export default DistributorManagement ;
+};
+
+export default DistributorManagement;
